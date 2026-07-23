@@ -535,13 +535,47 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
       <!-- ── 4. Per-Km Delivery Rate (NEW) ───────────────────────────────────── -->
       <div class="cfg-section" style="border:1px solid rgba(0,212,255,.2);background:rgba(0,212,255,.03);border-radius:12px;padding:16px 20px">
         <h4 style="color:var(--cyan)">🗺️ Per-Km Delivery Rate (Customer-Facing)</h4>
-        <p style="font-size:11px;color:var(--text3);margin-bottom:14px;font-family:var(--mono)">Set to <b>0</b> to keep the legacy distance-slab pricing (≤1km=₹30, ≤2km=₹40, etc).<br>Set &gt; 0 to switch to dynamic per-km rate — customer pays <b>₹X × distanceKm</b> (pre-GST, GST added on top).</p>
-        <div class="cfg-grid">
-          <div class="cfg-field">
-            <label>Delivery Charge Per Km to Customer — pre-GST (₹)</label>
-            <input type="number" id="pc-deliveryChargePerKmBase" step="1" min="0" max="200" placeholder="0" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" />
-            <span style="font-size:10px;color:var(--text3);margin-top:3px">e.g. 15 → 2 km order: ₹30 base → ₹35.40 incl. GST. <b>0 = use legacy slabs</b></span>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:14px;font-family:var(--mono)">Set to <b>0</b> to keep the legacy distance-slab pricing.<br>Set &gt; 0 to switch to explicit flat rate for that km slot — customer pays <b>₹X</b> (pre-GST, GST added on top).</p>
+        
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:12px;margin-bottom:8px;padding:0 4px">
+          <span style="font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.8px;text-transform:uppercase">Customer Charge (₹)</span>
+          <span style="font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.8px;text-transform:uppercase">Distance Slot</span>
+        </div>
+
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,212,255,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--cyan);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryCharge1km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border2)'" />
           </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">up to 1 km distance</span>
+        </div>
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,212,255,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--cyan);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryCharge2km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">1 km to 2 km distance</span>
+        </div>
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,212,255,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--cyan);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryCharge3km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">2 km to 3 km distance</span>
+        </div>
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,212,255,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--cyan);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryCharge4km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">3 km to 4 km distance</span>
+        </div>
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,212,255,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--cyan);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryCharge5km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">4 km to 5 km distance</span>
         </div>
         <div id="pc-delivery-mode-hint" style="margin-top:10px;padding:8px 12px;background:rgba(0,212,255,.07);border-radius:8px;font-size:11px;color:var(--cyan);font-family:var(--mono);display:none"></div>
       </div>
@@ -549,13 +583,47 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
       <!-- ── 5. Delivery Boy Per-Km Earning (NEW) ─────────────────────────────── -->
       <div class="cfg-section" style="border:1px solid rgba(0,230,118,.2);background:rgba(0,230,118,.03);border-radius:12px;padding:16px 20px">
         <h4 style="color:var(--green)">🧑‍🦺 Delivery Boy Earning Per Km</h4>
-        <p style="font-size:11px;color:var(--text3);margin-bottom:14px;font-family:var(--mono)">Set to <b>0</b> to use the legacy formula: rider earns <b>base − platform cut</b>.<br>Set &gt; 0 to pay rider a flat per-km rate regardless of slab. Must be <b>less than</b> the customer charge per km.</p>
-        <div class="cfg-grid">
-          <div class="cfg-field">
-            <label>Delivery Boy Earning Per Km — pre-GST (₹)</label>
-            <input type="number" id="pc-deliveryBoyEarningPerKm" step="1" min="0" max="200" placeholder="0" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" />
-            <span style="font-size:10px;color:var(--text3);margin-top:3px">e.g. 12 → 2 km order: rider earns ₹24. Must be &lt; deliveryChargePerKmBase. <b>0 = legacy formula</b></span>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:14px;font-family:var(--mono)">Set to <b>0</b> to use the legacy formula: rider earns <b>base − platform cut</b>.<br>Set &gt; 0 to pay rider an explicit flat rate. Must be <b>less than</b> the customer charge.</p>
+        
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:12px;margin-bottom:8px;padding:0 4px">
+          <span style="font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.8px;text-transform:uppercase">Rider Earning (₹)</span>
+          <span style="font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.8px;text-transform:uppercase">Distance Slot</span>
+        </div>
+
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,230,118,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--green);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryBoyEarning1km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'" />
           </div>
+          <span style="background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">up to 1 km distance</span>
+        </div>
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,230,118,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--green);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryBoyEarning2km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">1 km to 2 km distance</span>
+        </div>
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,230,118,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--green);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryBoyEarning3km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">2 km to 3 km distance</span>
+        </div>
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,230,118,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--green);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryBoyEarning4km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">3 km to 4 km distance</span>
+        </div>
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(0,230,118,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--green);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-deliveryBoyEarning5km" step="1" min="0" max="1000" placeholder="0" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s" oninput="pcMarkDirty();pcUpdateDeliveryModeHint()" onfocus="this.style.borderColor='var(--green)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">4 km to 5 km distance</span>
         </div>
       </div>
 
@@ -3026,7 +3094,8 @@ var PC_FIELDS = [
   'subscriptionPrice1Month','subscriptionPrice6Months','subscriptionPrice1Year',
   'gstRate','tdsPharmacyRate','tcsPharmacyRate',
   // Delivery per-km rate fields
-  'deliveryChargePerKmBase','deliveryBoyEarningPerKm',
+  'deliveryCharge1km','deliveryCharge2km','deliveryCharge3km','deliveryCharge4km','deliveryCharge5km',
+  'deliveryBoyEarning1km','deliveryBoyEarning2km','deliveryBoyEarning3km','deliveryBoyEarning4km','deliveryBoyEarning5km',
   // Per-km delivery charge waiver thresholds (each slot is independent)
   'relaxationMinOrder1km','relaxationMinOrder2km','relaxationMinOrder3km',
   'relaxationMinOrder4km','relaxationMinOrder5km'
@@ -3224,31 +3293,8 @@ async function pricingPreview() {
 
 /* ── Per-km delivery mode realtime hint ─────────────────────────────────── */
 function pcUpdateDeliveryModeHint() {
-  var kmEl  = document.getElementById('pc-deliveryChargePerKmBase');
-  var boyEl = document.getElementById('pc-deliveryBoyEarningPerKm');
-  var hint  = document.getElementById('pc-delivery-mode-hint');
-  if (!kmEl || !hint) return;
-  var kmRate  = parseFloat(kmEl.value)  || 0;
-  var boyRate = parseFloat(boyEl ? boyEl.value : '0') || 0;
-  if (kmRate > 0) {
-    var ex2km = Math.max(1, Math.ceil(2 * kmRate));
-    var ex5km = Math.max(1, Math.ceil(5 * kmRate));
-    var msg = '✅ Per-km mode active. ';
-    msg += '2 km → Customer: ₹' + Math.round(ex2km * 1.18 * 100)/100 + ' (incl. GST). ';
-    msg += '5 km → Customer: ₹' + Math.round(ex5km * 1.18 * 100)/100 + ' (incl. GST). ';
-    if (boyRate > 0 && boyRate < kmRate) {
-      var riderEx2 = Math.max(1, Math.ceil(2 * boyRate));
-      msg += '| Rider 2 km: ₹' + riderEx2 + ' (per-km mode).';
-    } else if (boyRate === 0) {
-      msg += '| Rider uses legacy formula.';
-    } else if (boyRate >= kmRate) {
-      msg += '| ⚠️ Rider rate must be LESS than customer charge per km!';
-    }
-    hint.style.display = 'block';
-    hint.textContent = msg;
-  } else {
-    hint.style.display = 'none';
-  }
+  var hint = document.getElementById('pc-delivery-mode-hint');
+  if (hint) hint.style.display = 'none';
 }
 
 /* ── Per-km delivery charge waiver — realtime summary hint ────────────────── */
