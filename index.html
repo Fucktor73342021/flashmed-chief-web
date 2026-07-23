@@ -625,6 +625,8 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
           </div>
           <span style="background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">4 km to 5 km distance</span>
         </div>
+        <!-- Live hint — shared with customer charge hint above -->
+        <div id="pc-rider-hint" style="margin-top:10px;padding:8px 12px;background:rgba(0,230,118,.07);border-radius:8px;font-size:11px;color:var(--green);font-family:var(--mono);display:none;line-height:1.8"></div>
       </div>
 
 
@@ -3291,11 +3293,73 @@ async function pricingPreview() {
   }
 }
 
-/* ── Per-km delivery mode realtime hint ─────────────────────────────────── */
+/* ── Per-km delivery slot pricing — realtime summary hint ───────────────── */
 function pcUpdateDeliveryModeHint() {
-  var hint = document.getElementById('pc-delivery-mode-hint');
-  if (hint) hint.style.display = 'none';
+  var hint      = document.getElementById('pc-delivery-mode-hint');
+  var riderHint = document.getElementById('pc-rider-hint');
+
+  var gst = 0.18;
+  var gstEl = document.getElementById('pc-gstRate');
+  if (gstEl && gstEl.value) gst = parseFloat(gstEl.value) || 0.18;
+
+  var slots = [
+    { km: 1, label: 'up to 1 km', chargeEl: document.getElementById('pc-deliveryCharge1km'), riderEl: document.getElementById('pc-deliveryBoyEarning1km') },
+    { km: 2, label: '1–2 km',     chargeEl: document.getElementById('pc-deliveryCharge2km'), riderEl: document.getElementById('pc-deliveryBoyEarning2km') },
+    { km: 3, label: '2–3 km',     chargeEl: document.getElementById('pc-deliveryCharge3km'), riderEl: document.getElementById('pc-deliveryBoyEarning3km') },
+    { km: 4, label: '3–4 km',     chargeEl: document.getElementById('pc-deliveryCharge4km'), riderEl: document.getElementById('pc-deliveryBoyEarning4km') },
+    { km: 5, label: '4–5 km',     chargeEl: document.getElementById('pc-deliveryCharge5km'), riderEl: document.getElementById('pc-deliveryBoyEarning5km') },
+  ];
+
+  var chargeLines = [];
+  var riderLines  = [];
+  var anyCharge   = false;
+  var anyRider    = false;
+
+  for (var s of slots) {
+    var charge = parseInt(s.chargeEl ? s.chargeEl.value : '0') || 0;
+    var rider  = parseInt(s.riderEl  ? s.riderEl.value  : '0') || 0;
+    var chargeGst = charge > 0 ? (Math.round(charge * (1 + gst) * 100) / 100).toFixed(2) : null;
+    var warn = (charge > 0 && rider > 0 && rider >= charge)
+      ? ' <span style="color:var(--red)">⚠️ rider ≥ charge!</span>' : '';
+
+    // Customer charge line
+    if (charge > 0) {
+      anyCharge = true;
+      chargeLines.push('<span style="color:var(--cyan)">✓ ' + s.label + ':</span> <b>₹' + chargeGst + '</b> incl.GST (₹' + charge + ' pre-GST)' + warn);
+    } else {
+      chargeLines.push('<span style="color:var(--text3)">⬜ ' + s.label + ': legacy slab</span>');
+    }
+
+    // Rider earning line
+    if (rider > 0) {
+      anyRider = true;
+      riderLines.push('<span style="color:var(--green)">✓ ' + s.label + ':</span> rider earns <b>₹' + rider + '</b>' + warn);
+    } else {
+      riderLines.push('<span style="color:var(--text3)">⬜ ' + s.label + ': legacy (base − cut)</span>');
+    }
+  }
+
+  // Update customer charge hint
+  if (hint) {
+    if (anyCharge) {
+      hint.style.display = 'block';
+      hint.innerHTML = chargeLines.join('<br>');
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+
+  // Update rider earning hint
+  if (riderHint) {
+    if (anyRider) {
+      riderHint.style.display = 'block';
+      riderHint.innerHTML = riderLines.join('<br>');
+    } else {
+      riderHint.style.display = 'none';
+    }
+  }
 }
+
 
 /* ── Per-km delivery charge waiver — realtime summary hint ────────────────── */
 function pcUpdateWaiverHint() {
