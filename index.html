@@ -559,24 +559,80 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
         </div>
       </div>
 
-      <!-- ── 6. Relaxation Fee (NEW) ─────────────────────────────────────────── -->
-      <div class="cfg-section" style="border:1px solid rgba(255,179,0,.2);background:rgba(255,179,0,.03);border-radius:12px;padding:16px 20px">
-        <h4 style="color:var(--amber)">🎁 Relaxation Fee — Free Delivery Offer</h4>
-        <p style="font-size:11px;color:var(--text3);margin-bottom:14px;font-family:var(--mono)">"Spend <b>₹X</b> and get delivery charges free up to <b>Y km</b>"<br>Set both to <b>0</b> to disable this feature. Both fields must be set together.</p>
-        <div class="cfg-grid">
-          <div class="cfg-field">
-            <label>Minimum Order Amount (₹X) for Free Delivery</label>
-            <input type="number" id="pc-relaxationMinOrderAmount" step="1" min="0" max="10000" placeholder="0" oninput="pcMarkDirty();pcUpdateRelaxationHint()" />
-            <span style="font-size:10px;color:var(--text3);margin-top:3px">e.g. 499 → customer pays ₹499+ to unlock free delivery. <b>0 = off</b></span>
-          </div>
-          <div class="cfg-field">
-            <label>Free Delivery Up To Y Km</label>
-            <input type="number" id="pc-relaxationFreeKmLimit" step="1" min="0" max="10" placeholder="0" oninput="pcMarkDirty();pcUpdateRelaxationHint()" />
-            <span style="font-size:10px;color:var(--text3);margin-top:3px">e.g. 3 → delivery is free within 3 km when order ≥ ₹X. <b>0 = off</b></span>
-          </div>
+
+      <!-- ── 6. Delivery Charge Waiver Offers ─────────────────────────────────── -->
+      <div class="cfg-section" style="border:1px solid rgba(255,179,0,.22);background:rgba(255,179,0,.03);border-radius:14px;padding:20px">
+        <h4 style="color:var(--amber);margin-bottom:6px">🎁 Delivery Charge Waiver Offers</h4>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:18px;font-family:var(--mono);line-height:1.6">
+          Set the <b>minimum purchase price</b> (quoted by pharmacy) for each distance slot to unlock free delivery.<br>
+          Leave <b>0</b> to disable waiver for that slot. Each km slot is fully independent.
+        </p>
+
+        <!-- Column headers -->
+        <div style="display:grid;grid-template-columns:200px 1fr;gap:12px;margin-bottom:8px;padding:0 4px">
+          <span style="font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.8px;text-transform:uppercase">Min Purchase Price (₹)</span>
+          <span style="font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.8px;text-transform:uppercase">Waiver Applies For</span>
         </div>
-        <div id="pc-relaxation-hint" style="margin-top:10px;padding:8px 12px;background:rgba(255,179,0,.07);border-radius:8px;font-size:11px;color:var(--amber);font-family:var(--mono);display:none"></div>
+
+        <!-- Row 1km -->
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(255,179,0,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--amber);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-relaxationMinOrder1km" step="1" min="0" max="100000" placeholder="0"
+              style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s"
+              oninput="pcMarkDirty();pcUpdateWaiverHint()" onfocus="this.style.borderColor='var(--amber)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">up to 1 km delivery charge waiver</span>
+        </div>
+
+        <!-- Row 2km -->
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(255,179,0,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--amber);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-relaxationMinOrder2km" step="1" min="0" max="100000" placeholder="0"
+              style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s"
+              oninput="pcMarkDirty();pcUpdateWaiverHint()" onfocus="this.style.borderColor='var(--amber)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">up to 2 km delivery charge waiver</span>
+        </div>
+
+        <!-- Row 3km -->
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(255,179,0,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--amber);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-relaxationMinOrder3km" step="1" min="0" max="100000" placeholder="0"
+              style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s"
+              oninput="pcMarkDirty();pcUpdateWaiverHint()" onfocus="this.style.borderColor='var(--amber)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">up to 3 km delivery charge waiver</span>
+        </div>
+
+        <!-- Row 4km -->
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:7px;border:1px solid rgba(255,179,0,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--amber);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-relaxationMinOrder4km" step="1" min="0" max="100000" placeholder="0"
+              style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s"
+              oninput="pcMarkDirty();pcUpdateWaiverHint()" onfocus="this.style.borderColor='var(--amber)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">up to 4 km delivery charge waiver</span>
+        </div>
+
+        <!-- Row 5km -->
+        <div class="waiver-row" style="display:grid;grid-template-columns:200px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:12px;border:1px solid rgba(255,179,0,.12)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13px;color:var(--amber);font-family:var(--mono);font-weight:700">₹</span>
+            <input type="number" id="pc-relaxationMinOrder5km" step="1" min="0" max="100000" placeholder="0"
+              style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:14px;font-weight:700;outline:none;font-family:var(--mono);transition:border-color .2s"
+              oninput="pcMarkDirty();pcUpdateWaiverHint()" onfocus="this.style.borderColor='var(--amber)'" onblur="this.style.borderColor='var(--border2)'" />
+          </div>
+          <span style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;font-family:var(--mono);display:inline-block">up to 5 km delivery charge waiver</span>
+        </div>
+
+        <!-- Live summary hint -->
+        <div id="pc-waiver-hint" style="padding:10px 14px;background:rgba(255,179,0,.07);border-radius:10px;font-size:11px;color:var(--amber);font-family:var(--mono);display:none;line-height:1.7"></div>
       </div>
+
 
       <!-- ── 7. Healthcare Commissions ────────────────────────────────────────── -->
 
@@ -2969,9 +3025,11 @@ var PC_FIELDS = [
   'doctorCommissionRateOnline','labCommissionRate','bloodSosFee',
   'subscriptionPrice1Month','subscriptionPrice6Months','subscriptionPrice1Year',
   'gstRate','tdsPharmacyRate','tcsPharmacyRate',
-  // New delivery per-km & relaxation fee fields
+  // Delivery per-km rate fields
   'deliveryChargePerKmBase','deliveryBoyEarningPerKm',
-  'relaxationMinOrderAmount','relaxationFreeKmLimit'
+  // Per-km delivery charge waiver thresholds (each slot is independent)
+  'relaxationMinOrder1km','relaxationMinOrder2km','relaxationMinOrder3km',
+  'relaxationMinOrder4km','relaxationMinOrder5km'
 ];
 
 var _pcDirty = false;
@@ -3097,9 +3155,24 @@ async function pricingPreview() {
     var content = document.getElementById('pc-preview-content');
     if (!panel || !content) return;
     var relaxBlock = '';
-    if (rel.enabled) {
-      relaxBlock = '<div style="margin-top:12px;padding:8px 12px;background:rgba(255,179,0,.08);border-radius:8px;font-size:11px;color:var(--amber)">';
-      relaxBlock += '<b>🎁 Relaxation:</b> ' + rel.note + '</div>';
+    // Build per-km waiver summary for preview
+    var wmap = rel.waiverMap || {};
+    var wLines = [];
+    for (var wkm = 1; wkm <= 5; wkm++) {
+      var thresh = wmap[wkm] || 0;
+      if (thresh > 0) {
+        wLines.push('<span style="color:var(--green)">✓</span> ₹' + thresh.toLocaleString('en-IN') + '+ → FREE up to ' + wkm + ' km' + (rel.appliedKmSlot === wkm && rel.waiverApplied ? ' <b style="color:var(--green)">(APPLIED)</b>' : ''));
+      } else {
+        wLines.push('<span style="color:var(--text3)">✕</span> ' + wkm + ' km: off');
+      }
+    }
+    if (wLines.length) {
+      relaxBlock = '<div style="margin-top:12px;padding:10px 14px;background:rgba(255,179,0,.08);border-radius:10px;font-size:11px;color:var(--amber);font-family:var(--mono);line-height:1.9">'
+        + '<b>🎁 Delivery Charge Waiver Offers:</b><br>'
+        + wLines.join('<br>') + '</div>';
+    }
+    if (rel.note) {
+      relaxBlock += '<div style="margin-top:6px;font-size:10px;color:var(--text3);font-family:var(--mono)">' + rel.note + '</div>';
     }
     var deliveryNote = '';
     if (dv.mode && dv.mode.indexOf('dynamic') !== -1) {
@@ -3178,27 +3251,39 @@ function pcUpdateDeliveryModeHint() {
   }
 }
 
-/* ── Relaxation fee realtime validation hint ─────────────────────────────── */
-function pcUpdateRelaxationHint() {
-  var minEl = document.getElementById('pc-relaxationMinOrderAmount');
-  var kmEl  = document.getElementById('pc-relaxationFreeKmLimit');
-  var hint  = document.getElementById('pc-relaxation-hint');
-  if (!minEl || !kmEl || !hint) return;
-  var minOrder = parseInt(minEl.value) || 0;
-  var freeKm   = parseInt(kmEl.value)  || 0;
-  if (minOrder > 0 && freeKm > 0) {
+/* ── Per-km delivery charge waiver — realtime summary hint ────────────────── */
+function pcUpdateWaiverHint() {
+  var hint = document.getElementById('pc-waiver-hint');
+  if (!hint) return;
+  var slots = [
+    { km: 1, el: document.getElementById('pc-relaxationMinOrder1km') },
+    { km: 2, el: document.getElementById('pc-relaxationMinOrder2km') },
+    { km: 3, el: document.getElementById('pc-relaxationMinOrder3km') },
+    { km: 4, el: document.getElementById('pc-relaxationMinOrder4km') },
+    { km: 5, el: document.getElementById('pc-relaxationMinOrder5km') },
+  ];
+  var lines = [];
+  var anyActive = false;
+  for (var s of slots) {
+    var v = s.el ? (parseInt(s.el.value) || 0) : 0;
+    if (v > 0) {
+      lines.push('🎁 Purchase ₹' + v.toLocaleString('en-IN') + '+ → delivery FREE up to ' + s.km + ' km');
+      anyActive = true;
+    } else {
+      lines.push('⬜ ' + s.km + ' km slot: OFF (0 = disabled)');
+    }
+  }
+  if (anyActive) {
     hint.style.display = 'block';
-    hint.textContent = '🎁 Active: "Spend ₹' + minOrder + '+ and get delivery free up to ' + freeKm + ' km" — applies to ALL new orders.';
-  } else if (minOrder > 0 && freeKm === 0) {
-    hint.style.display = 'block';
-    hint.textContent = '⚠️ Set free km limit (Y) too! Both fields must be > 0.';
-  } else if (minOrder === 0 && freeKm > 0) {
-    hint.style.display = 'block';
-    hint.textContent = '⚠️ Set minimum order amount (X) too! Both fields must be > 0.';
+    hint.innerHTML = lines.join('<br>');
   } else {
     hint.style.display = 'none';
   }
 }
+/* Backward-compat stub — no-op since old fields no longer exist */
+function pcUpdateRelaxationHint() {}
+
+
 
 /* ══════════════════════════════════════════════
    FEATURE CONTROL (Feature Flags)
