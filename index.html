@@ -153,6 +153,8 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
 .btn-modal{flex:1;padding:11px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;transition:all .15s;border:none}
 .btn-modal.cancel{background:var(--card2);border:1px solid var(--border2);color:var(--text2)}
 .btn-modal.danger{background:rgba(255,61,87,.1);border:1px solid rgba(255,61,87,.3);color:var(--red)}
+.btn-modal.warning{background:rgba(255,179,0,.1);border:1px solid rgba(255,179,0,.3);color:var(--amber)}
+.btn-modal.destroy{background:rgba(180,0,20,.18);border:2px solid rgba(255,61,87,.6);color:#ff1a36;font-weight:900;letter-spacing:.3px}
 .btn-modal.confirm{background:var(--violet);color:#fff}
 .btn-modal:disabled{opacity:.5;cursor:not-allowed}
 
@@ -340,6 +342,10 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
       </div>
       <div class="nav-item" data-page="orders">
         <span class="nav-icon">📦</span> Orders
+      </div>
+      <div class="nav-item" data-page="bookings" id="nav-bookings">
+        <span class="nav-icon">📋</span> Bookings
+        <span class="nav-badge cyan" id="bookings-nav-badge" style="display:none">0</span>
       </div>
       <div class="nav-item" data-page="payments">
         <span class="nav-icon">💳</span> Payments
@@ -1096,6 +1102,107 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
       </div>
     </div>
 
+    <!-- ═══ BOOKINGS — Doctor + Lab + Blood SOS ═══ -->
+    <div class="content page" id="page-bookings">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+        <div>
+          <h3 style="font-size:18px;font-weight:800;color:var(--text);margin:0">📋 All Bookings</h3>
+          <p style="font-size:12px;color:var(--text3);margin:4px 0 0;font-family:var(--mono)">Doctor Appointments · Lab Test Orders · Blood SOS Requests</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="count-badge" id="bookings-count">0</span>
+          <button class="btn-sm" onclick="refreshCurrent()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Summary Stats -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px" id="bk-stats">
+        <div class="stat-card" style="--accent-color:var(--violet);padding:14px 18px">
+          <div class="stat-label">Doctor Bookings</div>
+          <div class="stat-value" id="bk-doc-count">—</div>
+          <div class="stat-sub">Appointments loaded</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--cyan);padding:14px 18px">
+          <div class="stat-label">Lab Orders</div>
+          <div class="stat-value" id="bk-lab-count">—</div>
+          <div class="stat-sub">Test orders loaded</div>
+        </div>
+        <div class="stat-card" style="--accent-color:var(--red);padding:14px 18px">
+          <div class="stat-label">Blood SOS</div>
+          <div class="stat-value" id="bk-blood-count">—</div>
+          <div class="stat-sub">SOS requests loaded</div>
+        </div>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="pay-tabs" style="margin-bottom:16px">
+        <div class="pay-tab active" id="bktab-doctor" onclick="switchBookingTab('doctor')">🩺 Doctor Bookings <span class="ptab-badge" id="bktab-doctor-n" style="display:none">0</span></div>
+        <div class="pay-tab" id="bktab-lab" onclick="switchBookingTab('lab')">🧪 Lab Orders <span class="ptab-badge" id="bktab-lab-n" style="display:none">0</span></div>
+        <div class="pay-tab" id="bktab-blood" onclick="switchBookingTab('blood')">🩸 Blood SOS <span class="ptab-badge red" id="bktab-blood-n" style="display:none">0</span></div>
+      </div>
+
+      <!-- Search + Status Filter -->
+      <div class="filter-row" style="margin-bottom:14px">
+        <input class="filter-input" id="bk-search" placeholder="Search patient, ID, doctor, lab…" oninput="filterBookings()" style="min-width:220px"/>
+        <select id="bk-status-filter" onchange="filterBookings()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:6px 12px;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;outline:none">
+          <option value="all">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="PENDING">PENDING</option>
+          <option value="ACCEPTED">ACCEPTED</option>
+          <option value="FULFILLED">FULFILLED</option>
+          <option value="REJECTED">REJECTED</option>
+        </select>
+      </div>
+
+      <!-- Doctor Bookings Table -->
+      <div class="pay-section active" id="bksec-doctor">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Clinic</th><th>Slot Date</th><th>Slot Time</th><th>Mode</th><th>Amount</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
+            <tbody id="bk-doctor-table"><tr><td colspan="11" style="text-align:center;color:var(--text3);padding:20px">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Lab Orders Table -->
+      <div class="pay-section" id="bksec-lab">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Order ID</th><th>Customer</th><th>Phone</th><th>Lab UID</th><th>Tests</th><th>Amount</th><th>Payment</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
+            <tbody id="bk-lab-table"><tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Blood SOS Table -->
+      <div class="pay-section" id="bksec-blood">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Request ID</th><th>Patient</th><th>Blood Group</th><th>Units</th><th>Hospital</th><th>Urgency</th><th>Fee Paid</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
+            <tbody id="bk-blood-table"><tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Booking Detail Modal -->
+    <div class="modal-overlay" id="bk-detail-modal" onclick="closeOnBackdrop(event)">
+      <div class="modal" style="max-width:560px;width:95%">
+        <div class="modal-header">
+          <div class="modal-title" id="bk-detail-title">Booking Detail</div>
+          <button class="modal-close" onclick="closeModal('bk-detail-modal')">✕</button>
+        </div>
+        <div class="modal-body" id="bk-detail-body" style="max-height:70vh;overflow-y:auto"></div>
+        <div class="modal-actions">
+          <button class="btn-modal cancel" onclick="closeModal('bk-detail-modal')">Close</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ PAYMENTS — COMMAND CENTRE ═══ -->
     <div class="content page" id="page-payments">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px">
@@ -1818,13 +1925,20 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
 
 <!-- USER DETAIL MODAL -->
 <div class="modal-overlay" id="user-modal">
-  <div class="modal">
+  <div class="modal" style="max-width:560px;width:95%">
     <h3 id="user-modal-title">User Details</h3>
     <p id="user-modal-uid" style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:14px"></p>
     <div id="user-modal-body"></div>
-    <div class="modal-actions" style="margin-top:18px">
-      <button class="btn-modal cancel" onclick="closeModal('user-modal')">Close</button>
-      <button class="btn-modal danger" id="ban-btn" onclick="banUser()">Suspend User</button>
+    <!-- AI Ban Status Panel (shown when user has AI ban history) -->
+    <div id="ai-ban-panel" style="display:none;margin-top:12px;background:rgba(255,179,0,.07);border:1px solid rgba(255,179,0,.25);border-radius:10px;padding:12px 16px">
+      <div style="font-size:11px;font-weight:800;color:var(--amber);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">🤖 AI Prescription Ban Active</div>
+      <div id="ai-ban-info" style="font-size:12px;color:var(--text2);font-family:var(--mono)"></div>
+    </div>
+    <div class="modal-actions" style="margin-top:18px;flex-wrap:wrap;gap:8px">
+      <button class="btn-modal cancel" style="flex:0 0 auto;min-width:80px" onclick="closeModal('user-modal')">Close</button>
+      <button class="btn-modal warning" id="lift-ai-ban-btn" onclick="liftAiBan()" style="flex:1;min-width:140px" title="Reset AI prescription-upload ban counter and reactivate if AI-suspended">🤖 Lift AI Ban</button>
+      <button class="btn-modal danger" id="ban-btn" onclick="banUser()" style="flex:1;min-width:130px">Suspend User</button>
+      <button class="btn-modal destroy" id="delete-user-btn" onclick="confirmPermanentDelete()" style="flex:1;min-width:140px" title="Permanently remove this user and all their data from the database">🗑 Delete Forever</button>
     </div>
   </div>
 </div>
@@ -2017,6 +2131,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     else if (page === 'map') loadMap();
     else if (page === 'users') loadUsers();
     else if (page === 'orders') loadOrders();
+    else if (page === 'bookings') loadBookings();
     else if (page === 'payments') loadPayments();
     else if (page === 'payout') loadPayoutPage();
     else if (page === 'pricing') loadPricingConfig();
@@ -2157,7 +2272,7 @@ function viewUser(uid) {
         ['Phone', u.phone || '—'],
         ['Role', u.role || 'customer'],
         ['Email', u.email || '—'],
-        ['Status', u.isActive === false ? 'Suspended' : 'Active'],
+        ['Status', u.isActive === false ? '🔴 Suspended' : '🟢 Active'],
         ['Premium', u.isPremium ? 'Yes' : 'No'],
         ['Joined', fmtDate(u.createdAt)],
         ['On Duty', u.isOnDuty ? 'Yes' : 'No'],
@@ -2169,6 +2284,22 @@ function viewUser(uid) {
     </div>
     ${u.banReason ? `<div style="background:rgba(255,61,87,.08);border:1px solid rgba(255,61,87,.2);border-radius:10px;padding:12px;font-size:13px;color:var(--red)">Suspend reason: ${u.banReason}</div>` : ''}
   `;
+
+  // Show/hide AI ban panel based on banReason starting with 'AI:'
+  const aiPanel = document.getElementById('ai-ban-panel');
+  const aiInfo  = document.getElementById('ai-ban-info');
+  const isAiBan = u.isActive === false && typeof u.banReason === 'string' && u.banReason.startsWith('AI:');
+  if (isAiBan) {
+    aiPanel.style.display = 'block';
+    aiInfo.textContent = u.banReason;
+  } else {
+    aiPanel.style.display = 'none';
+  }
+
+  // Set delete button data
+  document.getElementById('delete-user-btn').dataset.uid = uid;
+  document.getElementById('delete-user-btn').dataset.name = u.name || uid;
+
   openModal('user-modal');
 }
 
@@ -2177,6 +2308,8 @@ async function banUser() {
   const u = allUsers.find(x => x.uid === currentUserUid);
   const isBanned = u?.isActive === false;
   const reason = isBanned ? '' : (prompt('Reason for suspension (optional):') ?? '');
+  const btn = document.getElementById('ban-btn');
+  btn.disabled = true;
   try {
     await apiFetch('/api/chief/users/' + currentUserUid + '/ban', {
       method: 'POST',
@@ -2186,6 +2319,82 @@ async function banUser() {
     closeModal('user-modal');
     loadUsers();
   } catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   LIFT AI BAN
+   Calls POST /api/chief/users/:uid/lift-ai-ban
+   Resets the AI upload counter AND reactivates account if AI-suspended.
+   Idempotent — safe to call even if user is not currently AI-banned.
+────────────────────────────────────────────────────────────── */
+async function liftAiBan() {
+  if (!currentUserUid) return;
+  const u = allUsers.find(x => x.uid === currentUserUid);
+  const name = u?.name || currentUserUid;
+
+  if (!confirm(`Lift AI ban for "${name}"?\n\nThis will:\n• Reset the AI prescription upload counter\n• Reactivate the account if it was suspended by the AI system\n\nThe user can immediately use AI features again.`)) return;
+
+  const btn = document.getElementById('lift-ai-ban-btn');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Lifting…';
+  try {
+    const data = await apiFetch('/api/chief/users/' + currentUserUid + '/lift-ai-ban', { method: 'POST', body: JSON.stringify({}) });
+    const msg = data.accountReactivated
+      ? `AI ban lifted & account reactivated for ${name}`
+      : `AI upload counter reset for ${name} (account was already active)`;
+    toast(msg, 'success');
+    closeModal('user-modal');
+    loadUsers();
+  } catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   PERMANENTLY DELETE USER
+   Two-stage confirmation to prevent accidental deletes.
+   Calls DELETE /api/chief/users/:uid with { confirm: "PERMANENTLY_DELETE" }
+────────────────────────────────────────────────────────────── */
+async function confirmPermanentDelete() {
+  if (!currentUserUid) return;
+  const u = allUsers.find(x => x.uid === currentUserUid);
+  const name = u?.name || currentUserUid;
+
+  // Stage 1: First confirmation
+  if (!confirm(
+    `⚠️ PERMANENTLY DELETE "${name}" (${currentUserUid})?\n\n` +
+    `This will IRREVERSIBLY remove:\n` +
+    `• User account & profile\n• Wallet & transactions\n• Notifications\n• Complaints & referrals\n` +
+    `• All linked records\n\n` +
+    `Orders are preserved for financial audit.\n\n` +
+    `This CANNOT be undone. Continue?`
+  )) return;
+
+  // Stage 2: Type-to-confirm safety gate
+  const typed = prompt(
+    `FINAL CONFIRMATION\n\nType the user's phone number (${u?.phone || 'phone'}) to confirm permanent deletion:`
+  );
+  if (typed === null) return; // cancelled
+  if (typed.replace(/\D/g, '').slice(-10) !== (u?.phone || '').replace(/\D/g, '').slice(-10)) {
+    toast('Phone number did not match — deletion cancelled.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('delete-user-btn');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Deleting…';
+  try {
+    await apiFetch('/api/chief/users/' + currentUserUid, {
+      method: 'DELETE',
+      body:   JSON.stringify({ confirm: 'PERMANENTLY_DELETE' }),
+    });
+    toast(`User "${name}" permanently deleted.`, 'success');
+    closeModal('user-modal');
+    loadUsers();
+  } catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = orig; }
 }
 
 function openAddUserModal() { openModal('add-user-modal'); }
@@ -2205,6 +2414,253 @@ async function createUser() {
     closeModal('add-user-modal');
     loadUsers();
   } catch (e) { toast(e.message,'error'); }
+}
+
+/* ══════════════════════════════════════════════
+   BOOKINGS — Doctor + Lab + Blood SOS
+══════════════════════════════════════════════ */
+let allDoctorBookings = [], allLabOrders = [], allBloodRequests = [];
+let bkActiveTab = 'doctor';
+
+async function loadBookings() {
+  try {
+    // Show loading skeleton in all tables
+    ['doctor', 'lab', 'blood'].forEach(t => {
+      const tb = document.getElementById('bk-' + t + '-table');
+      if (tb) tb.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:24px"><div class="spinner" style="margin:0 auto"></div></td></tr>';
+    });
+
+    const data = await apiFetch('/api/chief/bookings?limit=300');
+    allDoctorBookings = data.doctorBookings || [];
+    allLabOrders      = data.labOrders      || [];
+    allBloodRequests  = data.bloodRequests  || [];
+
+    const total = allDoctorBookings.length + allLabOrders.length + allBloodRequests.length;
+    document.getElementById('bookings-count').textContent = total;
+    document.getElementById('bk-doc-count').textContent   = allDoctorBookings.length.toLocaleString();
+    document.getElementById('bk-lab-count').textContent   = allLabOrders.length.toLocaleString();
+    document.getElementById('bk-blood-count').textContent = allBloodRequests.length.toLocaleString();
+
+    // Update nav badge
+    const navBadge = document.getElementById('bookings-nav-badge');
+    if (navBadge) { navBadge.textContent = total; navBadge.style.display = total ? 'flex' : 'none'; }
+
+    // Update tab badges
+    const setTabBadge = (id, n) => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = n; el.style.display = n ? 'inline' : 'none'; }
+    };
+    setTabBadge('bktab-doctor-n', allDoctorBookings.length);
+    setTabBadge('bktab-lab-n',    allLabOrders.length);
+    setTabBadge('bktab-blood-n',  allBloodRequests.length);
+
+    filterBookings();
+    document.getElementById('last-refresh').textContent = 'Refreshed ' + new Date().toLocaleTimeString('en-IN');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function switchBookingTab(tab) {
+  bkActiveTab = tab;
+  document.querySelectorAll('.pay-tab[id^="bktab-"]').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('[id^="bksec-"]').forEach(s => s.classList.remove('active'));
+  document.getElementById('bktab-' + tab).classList.add('active');
+  document.getElementById('bksec-'  + tab).classList.add('active');
+  filterBookings();
+}
+
+function filterBookings() {
+  const q   = (document.getElementById('bk-search')?.value || '').toLowerCase();
+  const st  = document.getElementById('bk-status-filter')?.value || 'all';
+
+  if (bkActiveTab === 'doctor')  renderDoctorBookingsTable(allDoctorBookings, q, st);
+  else if (bkActiveTab === 'lab')    renderLabOrdersTable(allLabOrders, q, st);
+  else if (bkActiveTab === 'blood')  renderBloodRequestsTable(allBloodRequests, q, st);
+}
+
+function bkStatusPill(s) {
+  const s2 = (s || '').toLowerCase();
+  const cls = s2 === 'completed' || s2 === 'fulfilled' || s2 === 'confirmed' || s2 === 'accepted'
+    ? 'green' : s2 === 'cancelled' || s2 === 'rejected' || s2 === 'expired'
+    ? 'red' : s2 === 'pending' || s2 === 'created'
+    ? 'amber' : 'gray';
+  return `<span class="pill ${cls}">${s || '—'}</span>`;
+}
+
+function renderDoctorBookingsTable(rows, q, st) {
+  const filtered = rows.filter(r => {
+    const matchSt = st === 'all' || r.status === st;
+    const hay = ((r.patientName || '') + (r.patientPhone || '') + (r.doctorName || '') + (r.clinicName || '') + r.id).toLowerCase();
+    return matchSt && (!q || hay.includes(q));
+  });
+  document.getElementById('bookings-count').textContent = filtered.length + ' / ' + allDoctorBookings.length;
+  const tbody = document.getElementById('bk-doctor-table');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:20px">No doctor bookings found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(b => `<tr>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--text)">#${b.id.slice(-8).toUpperCase()}</td>
+    <td><div style="font-weight:600;color:var(--text)">${bkEsc(b.patientName || '—')}</div><div style="font-size:11px;color:var(--text3)">${bkEsc(b.patientPhone || '')}</div></td>
+    <td>${bkEsc(b.doctorName || '—')}</td>
+    <td>${bkEsc(b.clinicName || '—')}</td>
+    <td style="font-family:var(--mono);font-size:12px">${b.slotDate || '—'}</td>
+    <td style="font-family:var(--mono);font-size:12px">${b.slotTime || '—'}</td>
+    <td><span class="pill ${b.bookingMode === 'free' ? 'gray' : b.bookingMode === 'full' ? 'violet' : 'amber'}">${b.bookingMode || '—'}</span></td>
+    <td style="color:var(--green);font-weight:700">${fmtMoney(b.amountPaid)}</td>
+    <td>${bkStatusPill(b.status)}</td>
+    <td style="font-size:11px">${fmtDate(b.createdAt)}</td>
+    <td><button class="btn-sm" onclick="viewBookingDetail('doctor','${b.id}')">View</button></td>
+  </tr>`).join('');
+}
+
+function renderLabOrdersTable(rows, q, st) {
+  const statusMap = { PENDING: 'pending', ACCEPTED: 'accepted', SAMPLE_COLLECTED: 'sample_collected', PROCESSING: 'processing', REPORT_READY: 'report_ready', COMPLETED: 'completed', REJECTED: 'rejected', CANCELLED: 'cancelled' };
+  const filtered = rows.filter(r => {
+    const rStatus = r.status?.toString() || '';
+    const matchSt = st === 'all' || rStatus === st || rStatus.toLowerCase() === st.toLowerCase();
+    const hay = ((r.customerName || '') + (r.customerPhone || '') + (r.orderId || '') + r.id + (r.labUid || '')).toLowerCase();
+    return matchSt && (!q || hay.includes(q));
+  });
+  document.getElementById('bookings-count').textContent = filtered.length + ' / ' + allLabOrders.length;
+  const tbody = document.getElementById('bk-lab-table');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px">No lab orders found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(b => {
+    const tests = Array.isArray(b.testsOrdered) ? b.testsOrdered : (typeof b.testsOrdered === 'string' ? JSON.parse(b.testsOrdered || '[]') : []);
+    const testNames = tests.slice(0, 2).map(t => t.name || t.testId || '?').join(', ') + (tests.length > 2 ? ` +${tests.length - 2}` : '');
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text)">${bkEsc(b.orderId || b.id.slice(-10).toUpperCase())}</td>
+      <td><div style="font-weight:600">${bkEsc(b.customerName || '—')}</div></td>
+      <td style="font-size:12px">${bkEsc(b.customerPhone || '—')}</td>
+      <td style="font-size:11px;font-family:var(--mono)">${bkEsc((b.labUid || '—').slice(0, 16))}</td>
+      <td style="font-size:11px;color:var(--text2)">${bkEsc(testNames || '—')}</td>
+      <td style="color:var(--green);font-weight:700">${fmtMoney(b.totalAmount)}</td>
+      <td><span class="pill ${b.paymentStatus === 'paid' ? 'green' : b.paymentStatus === 'refunded' ? 'violet' : 'amber'}">${b.paymentStatus || '—'}</span></td>
+      <td>${bkStatusPill(b.status)}</td>
+      <td style="font-size:11px">${fmtDate(b.createdAt)}</td>
+      <td><button class="btn-sm" onclick="viewBookingDetail('lab','${b.id}')">View</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderBloodRequestsTable(rows, q, st) {
+  const filtered = rows.filter(r => {
+    const rStatus = r.status?.toString() || '';
+    const matchSt = st === 'all' || rStatus === st || rStatus.toLowerCase() === st.toLowerCase();
+    const hay = ((r.patientName || '') + (r.requestId || '') + (r.bloodGroup || '') + (r.hospitalName || '') + r.id).toLowerCase();
+    return matchSt && (!q || hay.includes(q));
+  });
+  document.getElementById('bookings-count').textContent = filtered.length + ' / ' + allBloodRequests.length;
+  const tbody = document.getElementById('bk-blood-table');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px">No blood SOS requests found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(b => `<tr>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--text)">${bkEsc(b.requestId || b.id.slice(-10).toUpperCase())}</td>
+    <td style="font-weight:600">${bkEsc(b.patientName || '—')}</td>
+    <td><span class="pill red" style="font-size:11px;font-weight:800">${bkEsc(b.bloodGroup || '—')}</span></td>
+    <td style="font-family:var(--mono)">${b.unitsRequired ?? '—'} units</td>
+    <td style="font-size:12px">${bkEsc(b.hospitalName || '—')}</td>
+    <td><span class="pill ${b.urgency === 'critical' || b.urgency === 'emergency' ? 'red' : b.urgency === 'urgent' ? 'amber' : 'gray'}">${b.urgency || 'normal'}</span></td>
+    <td>${b.platformFeePaid ? '<span class="pill green">Paid</span>' : '<span class="pill amber">Unpaid</span>'}</td>
+    <td>${bkStatusPill(b.status)}</td>
+    <td style="font-size:11px">${fmtDate(b.createdAt)}</td>
+    <td><button class="btn-sm" onclick="viewBookingDetail('blood','${b.id}')">View</button></td>
+  </tr>`).join('');
+}
+
+// XSS-safe escape — prevents any injected HTML from patient/doctor data
+function bkEsc(s) {
+  if (s == null) return '—';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function viewBookingDetail(type, id) {
+  let item;
+  if      (type === 'doctor') item = allDoctorBookings.find(x => x.id === id);
+  else if (type === 'lab')    item = allLabOrders.find(x => x.id === id);
+  else if (type === 'blood')  item = allBloodRequests.find(x => x.id === id);
+  if (!item) return;
+
+  const typeLabel = type === 'doctor' ? '🩺 Doctor Booking' : type === 'lab' ? '🧪 Lab Order' : '🩸 Blood SOS';
+  document.getElementById('bk-detail-title').textContent = typeLabel;
+
+  // Build key-value pairs based on booking type
+  let pairs = [];
+  if (type === 'doctor') {
+    pairs = [
+      ['Booking ID', '#' + item.id.slice(-8).toUpperCase()],
+      ['Patient Name', item.patientName],
+      ['Patient Phone', item.patientPhone],
+      ['Doctor', item.doctorName],
+      ['Clinic', item.clinicName],
+      ['Slot Date', item.slotDate],
+      ['Slot Time', item.slotTime],
+      ['Booking Mode', item.bookingMode],
+      ['Amount Paid', fmtMoney(item.amountPaid)],
+      ['Serial #', item.serialNumber ?? '—'],
+      ['Status', item.status],
+      ['Cancel Reason', item.cancelReason],
+      ['Customer UID', item.customerId],
+      ['Created', fmtDate(item.createdAt)],
+      ['Updated', fmtDate(item.updatedAt)],
+    ];
+  } else if (type === 'lab') {
+    const tests = Array.isArray(item.testsOrdered) ? item.testsOrdered : (typeof item.testsOrdered === 'string' ? JSON.parse(item.testsOrdered || '[]') : []);
+    pairs = [
+      ['Order ID', item.orderId || item.id.slice(-10).toUpperCase()],
+      ['Customer Name', item.customerName],
+      ['Customer Phone', item.customerPhone],
+      ['Customer UID', item.customerUid],
+      ['Lab UID', item.labUid],
+      ['Status', item.status],
+      ['Total Amount', fmtMoney(item.totalAmount)],
+      ['Payment Status', item.paymentStatus],
+      ['Payment Method', item.paymentMethod],
+      ['Booking Mode', item.bookingMode],
+      ['Rejection Reason', item.rejectionReason],
+      ['Tests', tests.map(t => t.name || t.testId).join(', ') || '—'],
+      ['Created', fmtDate(item.createdAt)],
+      ['Updated', fmtDate(item.updatedAt)],
+    ];
+  } else {
+    pairs = [
+      ['Request ID', item.requestId],
+      ['Patient Name', item.patientName],
+      ['Requester UID', item.requesterId],
+      ['Blood Group', item.bloodGroup],
+      ['Units Required', item.unitsRequired],
+      ['Hospital', item.hospitalName],
+      ['Urgency', item.urgency],
+      ['Platform Fee', fmtMoney(item.platformFee)],
+      ['Fee Paid', item.platformFeePaid ? 'Yes' : 'No'],
+      ['Status', item.status],
+      ['Assigned Bank', item.assignedBankName],
+      ['Bank Phone', item.assignedBankPhone],
+      ['Refund Status', item.refundStatus],
+      ['Fake Flag', item.markedFakeAt ? 'Flagged ' + fmtDate(item.markedFakeAt) : 'Clean'],
+      ['Created', fmtDate(item.createdAt)],
+      ['Updated', fmtDate(item.updatedAt)],
+    ];
+  }
+
+  document.getElementById('bk-detail-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${pairs.map(([k, v]) => `<div style="background:var(--bg3);border-radius:10px;padding:10px 14px">
+        <div style="font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">${bkEsc(k)}</div>
+        <div style="font-size:13px;color:var(--text);font-weight:600;font-family:var(--mono);word-break:break-all">${bkEsc(v != null ? String(v) : '—')}</div>
+      </div>`).join('')}
+    </div>
+  `;
+  openModal('bk-detail-modal');
 }
 
 /* ══════════════════════════════════════════════
