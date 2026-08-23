@@ -2239,6 +2239,26 @@ function setRoleFilter(el, role) {
 
 function filterUsers() { renderUsersTable(); }
 
+/* ─────────────────────────────────────────────────────────────────
+   Determines if a user has any active AI ban.
+   Returns an object: { hasAiBan: bool, reason: string }
+   Logic:
+     1. Hard AI-suspend: isActive===false AND banReason starts with 'AI:'
+     2. Timed AI-suspend: aiCounter.aiBanActive === true  (suspendedUntil > now)
+   Either condition = AI ban active.
+───────────────────────────────────────────────────────────────── */
+function getAiBanState(u) {
+  const hardBan = u.isActive === false && typeof u.banReason === 'string' && u.banReason.startsWith('AI:');
+  const timedBan = !!(u.aiCounter?.aiBanActive);
+  return {
+    hasAiBan: hardBan || timedBan,
+    hardBan,
+    timedBan,
+    count: u.aiCounter?.consecutiveCount || 0,
+    suspendedUntil: u.aiCounter?.suspendedUntil || null,
+  };
+}
+
 function renderUsersTable() {
   const q = document.getElementById('user-search').value.toLowerCase();
   const rows = allUsers.filter(u => {
@@ -2249,23 +2269,38 @@ function renderUsersTable() {
   document.getElementById('users-count').textContent = rows.length + ' / ' + allUsers.length;
   const tbody = document.getElementById('users-table');
   if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">No users found</td></tr>'; return; }
-  tbody.innerHTML = rows.map(u => `<tr>
-    <td style="color:var(--text);font-weight:600">${u.name || '—'}</td>
-    <td>${u.phone || u.uid?.replace('user_','') || '—'}</td>
-    <td><span class="pill ${u.role === 'seller' ? 'cyan' : u.role === 'delivery' ? 'green' : u.role === 'admin' ? 'violet' : u.role === 'chief_manager' ? 'amber' : 'gray'}">${u.role || 'customer'}</span></td>
-    <td>${u.isActive === false ? '<span class="pill red">Suspended</span>' : '<span class="pill green">Active</span>'}</td>
-    <td>${fmtDate(u.createdAt)}</td>
-    <td><button class="btn-sm" onclick="viewUser('${u.uid}')">View</button></td>
-  </tr>`).join('');
+  tbody.innerHTML = rows.map(u => {
+    const ai = getAiBanState(u);
+    const statusCell = u.isActive === false
+      ? `<span class="pill red">Suspended</span>${ai.hardBan ? ' <span title="AI-suspended" style="font-size:11px">🤖</span>' : ''}`
+      : `<span class="pill green">Active</span>${ai.timedBan ? ' <span title="AI upload ban active" style="font-size:11px;color:var(--amber)">🤖</span>' : ''}`;
+    const countWarn = ai.count >= 5 && !ai.hasAiBan
+      ? `<span title="${ai.count} invalid AI uploads" style="font-size:10px;color:var(--amber);margin-left:3px">(${ai.count}⚠)</span>`
+      : '';
+    return `<tr>
+      <td style="color:var(--text);font-weight:600">${u.name || '—'}${countWarn}</td>
+      <td>${u.phone || u.uid?.replace('user_','') || '—'}</td>
+      <td><span class="pill ${u.role === 'seller' ? 'cyan' : u.role === 'delivery' ? 'green' : u.role === 'admin' ? 'violet' : u.role === 'chief_manager' ? 'amber' : 'gray'}">${u.role || 'customer'}</span></td>
+      <td>${statusCell}</td>
+      <td>${fmtDate(u.createdAt)}</td>
+      <td><button class="btn-sm" onclick="viewUser('${u.uid}')">View</button></td>
+    </tr>`;
+  }).join('');
 }
+
 
 function viewUser(uid) {
   const u = allUsers.find(x => x.uid === uid);
   if (!u) return;
   currentUserUid = uid;
+
+  // Compute AI ban state using shared helper
+  const ai = getAiBanState(u);
+
   document.getElementById('user-modal-title').textContent = u.name || 'User';
   document.getElementById('user-modal-uid').textContent = 'UID: ' + uid;
   document.getElementById('ban-btn').textContent = u.isActive === false ? 'Reactivate User' : 'Suspend User';
+
   document.getElementById('user-modal-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
       ${[
@@ -2273,7 +2308,7 @@ function viewUser(uid) {
         ['Role', u.role || 'customer'],
         ['Email', u.email || '—'],
         ['Status', u.isActive === false ? '🔴 Suspended' : '🟢 Active'],
-        ['Premium', u.isPremium ? 'Yes' : 'No'],
+        ['AI Uploads', ai.count > 0 ? `${ai.count} invalid${ai.hasAiBan ? ' 🔴' : ai.count >= 5 ? ' ⚠️' : ''}` : 'Clean'],
         ['Joined', fmtDate(u.createdAt)],
         ['On Duty', u.isOnDuty ? 'Yes' : 'No'],
         ['KYC', u.kycStatus || '—'],
@@ -2282,21 +2317,50 @@ function viewUser(uid) {
         <div style="font-size:13px;color:var(--text);font-weight:600;font-family:var(--mono)">${v}</div>
       </div>`).join('')}
     </div>
-    ${u.banReason ? `<div style="background:rgba(255,61,87,.08);border:1px solid rgba(255,61,87,.2);border-radius:10px;padding:12px;font-size:13px;color:var(--red)">Suspend reason: ${u.banReason}</div>` : ''}
+    ${u.banReason && !u.banReason.startsWith('AI:') ? `<div style="background:rgba(255,61,87,.08);border:1px solid rgba(255,61,87,.2);border-radius:10px;padding:12px;font-size:13px;color:var(--red);margin-bottom:6px">🚫 Suspend reason: ${u.banReason}</div>` : ''}
   `;
 
-  // Show/hide AI ban panel based on banReason starting with 'AI:'
+  // ── AI Ban Panel — show details when AI ban is active or count is warning level ──
   const aiPanel = document.getElementById('ai-ban-panel');
   const aiInfo  = document.getElementById('ai-ban-info');
-  const isAiBan = u.isActive === false && typeof u.banReason === 'string' && u.banReason.startsWith('AI:');
-  if (isAiBan) {
+  aiPanel.style.cssText = ''; // reset inline styles
+
+  if (ai.hasAiBan) {
     aiPanel.style.display = 'block';
-    aiInfo.textContent = u.banReason;
+    aiPanel.style.background = 'rgba(255,179,0,.07)';
+    aiPanel.style.borderColor = 'rgba(255,179,0,.25)';
+    const titleEl = aiPanel.querySelector('div');
+    if (titleEl) { titleEl.style.color = 'var(--amber)'; titleEl.textContent = '🤖 AI Prescription Ban Active'; }
+    let details = '';
+    if (ai.hardBan) details = `Hard-suspended by AI. Reason: ${u.banReason}`;
+    if (ai.timedBan && ai.suspendedUntil) {
+      const exp = new Date(ai.suspendedUntil).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+      details += (details ? ' | ' : '') + `Timed AI ban until: ${exp}`;
+    }
+    if (ai.count) details += (details ? ' | ' : '') + `${ai.count} invalid uploads`;
+    aiInfo.textContent = details;
+  } else if (ai.count >= 5) {
+    // High count but not yet banned — show soft warning
+    aiPanel.style.display = 'block';
+    aiPanel.style.background = 'rgba(255,61,87,.05)';
+    aiPanel.style.borderColor = 'rgba(255,61,87,.2)';
+    const titleEl = aiPanel.querySelector('div');
+    if (titleEl) { titleEl.style.color = 'var(--red)'; titleEl.textContent = '⚠️ High Invalid Upload Count'; }
+    aiInfo.textContent = `${ai.count} invalid AI prescription uploads — ban triggers at 10. No active ban yet.`;
   } else {
     aiPanel.style.display = 'none';
   }
 
-  // Set delete button data
+  // ── Lift AI Ban button — ONLY visible when AI ban is actually active ──────
+  const liftBtn = document.getElementById('lift-ai-ban-btn');
+  if (ai.hasAiBan) {
+    liftBtn.style.display = '';  // show
+    liftBtn.title = ai.hardBan ? 'Lift hard AI-suspension + reset counter' : 'Clear timed AI ban + reset counter';
+  } else {
+    liftBtn.style.display = 'none';  // hide — no AI ban on this user
+  }
+
+  // Set delete button meta
   document.getElementById('delete-user-btn').dataset.uid = uid;
   document.getElementById('delete-user-btn').dataset.name = u.name || uid;
 
