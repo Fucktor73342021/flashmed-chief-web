@@ -1060,38 +1060,33 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
     <!-- ═══ USERS ═══ -->
     <div class="content page" id="page-users">
 
-      <!-- ── 🚫 BANNED USERS QUICK-ACTION PANEL ──────────────────────────────────
-           Always visible at top of Users page. Shows only banned users for instant
-           access — no need to scroll through all users to find and unban someone.
-           Full Unban button resets ALL ban vectors: account + fraud score + AI ban.
+      <!-- ── 🤖 DOCZY AI BANS PANEL ──────────────────────────────────────────────
+           Shows users who are blocked from the Doczy AI assistant (doctor finder AI).
+           A user gets banned when they try to impersonate an admin through Doczy.
+           "Lift Doczy Ban" sets a server-side Redis signal — the next time
+           the user opens Doczy on their phone, the app reads it and clears
+           the local ban automatically. No reinstall needed.
       ──────────────────────────────────────────────────────────────────────────── -->
-      <div id="banned-panel" style="background:rgba(255,61,87,.05);border:1px solid rgba(255,61,87,.2);border-radius:14px;padding:18px;margin-bottom:20px">
+      <div id="doczy-ban-panel" style="background:rgba(26,115,232,.05);border:1px solid rgba(26,115,232,.2);border-radius:14px;padding:18px;margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
           <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-size:18px">🚫</span>
+            <span style="font-size:20px">🤖</span>
             <div>
-              <div style="font-size:14px;font-weight:800;color:var(--text)">Banned Users</div>
-              <div style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="banned-subtitle">Loading...</div>
+              <div style="font-size:14px;font-weight:800;color:var(--text)">Doczy AI Bans</div>
+              <div style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="doczy-subtitle">Loading...</div>
             </div>
-            <span id="banned-count-badge" style="background:var(--red);color:#fff;font-size:11px;font-weight:800;min-width:22px;height:22px;border-radius:11px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono)">0</span>
+            <span id="doczy-count-badge" style="background:#1A73E8;color:#fff;font-size:11px;font-weight:800;min-width:22px;height:22px;border-radius:11px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono)">0</span>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <!-- Filter tabs -->
-            <div id="bfilt-all"    class="filter-tab active" onclick="setBanFilter('all',this)"    style="font-size:11px;padding:5px 12px">All Bans</div>
-            <div id="bfilt-fraud"  class="filter-tab"        onclick="setBanFilter('fraud',this)"  style="font-size:11px;padding:5px 12px">🤖 Fraud</div>
-            <div id="bfilt-ai"    class="filter-tab"        onclick="setBanFilter('ai',this)"    style="font-size:11px;padding:5px 12px">🔬 AI Upload</div>
-            <div id="bfilt-manual" class="filter-tab"        onclick="setBanFilter('manual',this)" style="font-size:11px;padding:5px 12px">✋ Manual</div>
-          </div>
+          <button class="btn-sm" onclick="loadDocyzBans()" style="font-size:11px">↻ Refresh</button>
         </div>
-        <!-- Banned users list -->
-        <div id="banned-list">
+        <div id="doczy-list">
           <div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">
             <div class="spinner" style="margin:0 auto 8px"></div>
-            Loading banned users...
+            Loading...
           </div>
         </div>
-        <div id="banned-empty" style="display:none;text-align:center;padding:16px;color:var(--text3);font-size:13px">
-          ✅ No banned users right now — platform is clean!
+        <div id="doczy-empty" style="display:none;text-align:center;padding:14px;color:var(--text3);font-size:13px">
+          ✅ No Doczy AI bans right now.
         </div>
       </div>
 
@@ -2262,10 +2257,94 @@ async function loadUsers() {
     allUsers = data.users || [];
     document.getElementById('users-count').textContent = allUsers.length;
     renderUsersTable();
-    renderBannedPanel();   // ← also update the banned users quick-action panel
+    renderBannedPanel();
+    loadDocyzBans();   // ← refresh Doczy AI ban panel in parallel
     document.getElementById('last-refresh').textContent = 'Refreshed ' + new Date().toLocaleTimeString('en-IN');
   } catch (e) { toast(e.message, 'error'); }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   DOCZY AI BAN PANEL
+   ════════════════════════════════════════════════════════════════════
+
+   Shows users blocked from the Doczy AI (Find Doctor AI assistant).
+   Ban is stored CLIENT-SIDE in the user's phone AsyncStorage.
+   Chief lifts it by calling POST /api/ai-helpdesk/lift-ban which
+   sets a Redis signal. On next Doczy open, the app reads the signal
+   and clears the local ban automatically — no reinstall needed.
+   ══════════════════════════════════════════════════════════════════ */
+
+async function loadDocyzBans() {
+  const listEl    = document.getElementById('doczy-list');
+  const emptyEl   = document.getElementById('doczy-empty');
+  const badgeEl   = document.getElementById('doczy-count-badge');
+  const subtitleEl= document.getElementById('doczy-subtitle');
+
+  try {
+    const data = await apiFetch('/api/ai-helpdesk/banned-list');
+    const users = data.bannedUsers || [];
+
+    if (badgeEl)    badgeEl.textContent    = users.length;
+    if (subtitleEl) subtitleEl.textContent = users.length === 0
+      ? 'No Doczy AI bans'
+      : `${users.length} user${users.length !== 1 ? 's' : ''} blocked from Doczy · lift ban to restore access`;
+
+    if (users.length === 0) {
+      if (listEl)  listEl.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    if (listEl) listEl.innerHTML = users.map(u => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(26,115,232,.1);gap:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <div style="background:rgba(26,115,232,.12);width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">🤖</div>
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">${u.name || '—'}</div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${u.phone || u.uid || '—'} · ${u.role || 'customer'}</div>
+            <div style="font-size:10px;color:#1A73E8;margin-top:2px">⚠️ Blocked: tried to impersonate admin via Doczy AI</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="color:#1A73E8;font-size:10px;font-weight:800;background:rgba(26,115,232,.1);padding:2px 8px;border-radius:6px">DOCZY BANNED</span>
+          <button class="btn-sm green" style="font-size:11px;padding:4px 12px"
+            onclick="liftDocyzBan('${u.uid}','${(u.name||u.uid||'').replace(/'/g,"\\'")}')"
+            title="Lifts the Doczy AI ban — user can use the AI again on next app open">
+            🤖 Lift Doczy Ban
+          </button>
+          <button class="btn-sm" style="font-size:11px;padding:4px 10px" onclick="viewUser('${u.uid}')">View</button>
+        </div>
+      </div>`).join('');
+
+  } catch (e) {
+    if (subtitleEl) subtitleEl.textContent = 'Error loading — ' + e.message;
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:12px;color:var(--red);font-size:12px">Failed to load: ${e.message}</div>`;
+  }
+}
+
+/* ── Lift Doczy ban for a specific user ─────────────────────────────────────
+   Calls POST /api/ai-helpdesk/lift-ban with the user's UID.
+   Backend sets Redis key doczy_ban_lifted:{uid} for 7 days.
+   On next Doczy open, the app's checkAndClearChiefLiftedBan() reads it
+   and clears the local AsyncStorage block — user is unbanned automatically.
+   ─────────────────────────────────────────────────────────────────────────── */
+async function liftDocyzBan(uid, name) {
+  if (!uid) return;
+  if (!confirm(`Lift Doczy AI ban for "${name}"?\n\nThe user will be able to use the Doczy AI assistant again the next time they open it on their phone.\n\n(The ban is stored on their device — this sends a signal to clear it automatically.)`)) return;
+  try {
+    const data = await apiFetch('/api/ai-helpdesk/lift-ban', {
+      method: 'POST',
+      body: JSON.stringify({ uid }),
+    });
+    toast(data.message || `Doczy ban lifted for ${name}`, 'success');
+    loadDocyzBans();   // refresh the panel
+  } catch (e) {
+    toast('Failed to lift Doczy ban: ' + e.message, 'error');
+  }
+}
+
+
 
 /* ══════════════════════════════════════════════════════════════════════
    BANNED USERS QUICK-ACTION PANEL
