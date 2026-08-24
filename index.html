@@ -1059,6 +1059,42 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
 
     <!-- ═══ USERS ═══ -->
     <div class="content page" id="page-users">
+
+      <!-- ── 🚫 BANNED USERS QUICK-ACTION PANEL ──────────────────────────────────
+           Always visible at top of Users page. Shows only banned users for instant
+           access — no need to scroll through all users to find and unban someone.
+           Full Unban button resets ALL ban vectors: account + fraud score + AI ban.
+      ──────────────────────────────────────────────────────────────────────────── -->
+      <div id="banned-panel" style="background:rgba(255,61,87,.05);border:1px solid rgba(255,61,87,.2);border-radius:14px;padding:18px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:18px">🚫</span>
+            <div>
+              <div style="font-size:14px;font-weight:800;color:var(--text)">Banned Users</div>
+              <div style="font-size:11px;color:var(--text3);font-family:var(--mono)" id="banned-subtitle">Loading...</div>
+            </div>
+            <span id="banned-count-badge" style="background:var(--red);color:#fff;font-size:11px;font-weight:800;min-width:22px;height:22px;border-radius:11px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono)">0</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <!-- Filter tabs -->
+            <div id="bfilt-all"    class="filter-tab active" onclick="setBanFilter('all',this)"    style="font-size:11px;padding:5px 12px">All Bans</div>
+            <div id="bfilt-fraud"  class="filter-tab"        onclick="setBanFilter('fraud',this)"  style="font-size:11px;padding:5px 12px">🤖 Fraud</div>
+            <div id="bfilt-ai"    class="filter-tab"        onclick="setBanFilter('ai',this)"    style="font-size:11px;padding:5px 12px">🔬 AI Upload</div>
+            <div id="bfilt-manual" class="filter-tab"        onclick="setBanFilter('manual',this)" style="font-size:11px;padding:5px 12px">✋ Manual</div>
+          </div>
+        </div>
+        <!-- Banned users list -->
+        <div id="banned-list">
+          <div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">
+            <div class="spinner" style="margin:0 auto 8px"></div>
+            Loading banned users...
+          </div>
+        </div>
+        <div id="banned-empty" style="display:none;text-align:center;padding:16px;color:var(--text3);font-size:13px">
+          ✅ No banned users right now — platform is clean!
+        </div>
+      </div>
+
       <div class="section-header">
         <h3>All Users</h3>
         <div style="display:flex;gap:8px">
@@ -2226,9 +2262,167 @@ async function loadUsers() {
     allUsers = data.users || [];
     document.getElementById('users-count').textContent = allUsers.length;
     renderUsersTable();
+    renderBannedPanel();   // ← also update the banned users quick-action panel
     document.getElementById('last-refresh').textContent = 'Refreshed ' + new Date().toLocaleTimeString('en-IN');
   } catch (e) { toast(e.message, 'error'); }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   BANNED USERS QUICK-ACTION PANEL
+   ════════════════════════════════════════════════════════════════════
+
+   Architecture:
+     • Pure client-side filter of the already-loaded allUsers array — zero
+       extra network calls. Data is always fresh after any loadUsers() call.
+     • Ban type detection:
+         – Fraud ban  : banReason is a JSON array string (from fraudDetection.js)
+         – AI ban     : banReason starts with 'AI:' (from aiSecurityService.js)
+         – Manual ban : banReason is any other string (set by chief/admin)
+         – Timed AI   : aiCounter.aiBanActive is true (timer not yet expired)
+     • fullUnban()   : Calls POST /api/chief/users/:uid/full-unban
+                       Atomically: reactivates account + resets fraud score + clears
+                       AI upload counter. Prevents immediate re-ban after manual unban.
+     • setBanFilter(): Local filter by ban type — no re-fetch needed.
+   ══════════════════════════════════════════════════════════════════ */
+
+let _banFilter = 'all';  // current filter: 'all' | 'fraud' | 'ai' | 'manual'
+
+function _classifyBan(u) {
+  // Timed AI ban (upload counter ban still active, user may be isActive=true)
+  const timedAi = !!(u.aiCounter?.aiBanActive);
+  if (!u.isActive && timedAi) return 'ai';
+
+  if (u.isActive === false) {
+    const r = u.banReason || '';
+    if (r.startsWith('AI:')) return 'ai';
+    // Fraud ban: stored as JSON array ["multi_account_device","velocity_abuse"]
+    try { const p = JSON.parse(r); if (Array.isArray(p)) return 'fraud'; } catch (_) {}
+    return 'manual';
+  }
+  if (timedAi) return 'ai';   // user is active but has timed AI ban
+  return null;
+}
+
+function _banTypeLabel(type) {
+  if (type === 'fraud')  return '<span style="color:var(--amber);font-size:10px;font-weight:800">🤖 FRAUD</span>';
+  if (type === 'ai')     return '<span style="color:var(--violet);font-size:10px;font-weight:800">🔬 AI UPLOAD</span>';
+  if (type === 'manual') return '<span style="color:var(--red);font-size:10px;font-weight:800">✋ MANUAL</span>';
+  return '';
+}
+
+function renderBannedPanel() {
+  // Collect banned users: hard-banned (isActive=false) OR timed AI ban
+  const banned = allUsers.filter(u => {
+    if (u.isActive === false) return true;            // hard banned
+    if (u.aiCounter?.aiBanActive) return true;        // timed AI ban
+    return false;
+  });
+
+  const badgeEl    = document.getElementById('banned-count-badge');
+  const subtitleEl = document.getElementById('banned-subtitle');
+  const listEl     = document.getElementById('banned-list');
+  const emptyEl    = document.getElementById('banned-empty');
+
+  if (badgeEl)    badgeEl.textContent = banned.length;
+  if (subtitleEl) subtitleEl.textContent =
+    banned.length === 0
+      ? 'No banned users'
+      : `${banned.length} user${banned.length !== 1 ? 's' : ''} banned · click Full Unban to restore access`;
+
+  // Apply type filter
+  const filtered = _banFilter === 'all'
+    ? banned
+    : banned.filter(u => _classifyBan(u) === _banFilter);
+
+  if (filtered.length === 0) {
+    if (listEl) listEl.innerHTML = '';
+    if (emptyEl) {
+      emptyEl.style.display = 'block';
+      emptyEl.textContent = banned.length === 0
+        ? '✅ No banned users right now — platform is clean!'
+        : `No "${_banFilter}" bans found. Try a different filter.`;
+    }
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  if (listEl) listEl.innerHTML = filtered.map(u => {
+    const banType     = _classifyBan(u);
+    const typeLabel   = _banTypeLabel(banType);
+    const reasonRaw   = u.banReason || '';
+    let reasonDisplay = reasonRaw;
+    // Format fraud reason (JSON array) nicely
+    try {
+      const p = JSON.parse(reasonRaw);
+      if (Array.isArray(p)) reasonDisplay = p.join(', ');
+    } catch (_) {}
+
+    const hasAiBan = !!(u.isActive === false && (reasonRaw.startsWith('AI:') || u.aiCounter?.aiBanActive)) || !!(u.aiCounter?.aiBanActive);
+
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,61,87,.1);gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <div style="background:rgba(255,61,87,.15);width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">🚫</div>
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">${u.name || '—'}</div>
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono)">${u.phone || u.uid?.replace('user_','') || '—'} · ${u.role || 'customer'}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:1px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${reasonDisplay}">${reasonDisplay ? '🔒 ' + reasonDisplay.slice(0,80) + (reasonDisplay.length>80?'…':'') : ''}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        ${typeLabel}
+        ${hasAiBan ? `<button class="btn-sm" style="color:var(--amber);border-color:rgba(255,179,0,.3);font-size:11px;padding:4px 10px" onclick="liftAiBanById('${u.uid}','${(u.name||u.uid).replace(/'/g,'\\\'')}')" title="Clear AI upload ban counter">🤖 Lift AI Ban</button>` : ''}
+        <button class="btn-sm green" style="font-size:11px;padding:4px 12px" onclick="fullUnban('${u.uid}','${(u.name||u.uid).replace(/'/g,'\\\'')}')" title="Full Unban: reactivates account + resets fraud score + clears AI ban">✓ Full Unban</button>
+        <button class="btn-sm" style="font-size:11px;padding:4px 10px" onclick="viewUser('${u.uid}')">View</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setBanFilter(type, el) {
+  _banFilter = type;
+  document.querySelectorAll('#banned-panel .filter-tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderBannedPanel();
+}
+
+/* ── FULL UNBAN — Resets ALL ban vectors in one atomic backend call ───────────
+   Calls POST /api/chief/users/:uid/full-unban
+   Backend atomically:
+     1. Sets isActive=true, banReason=null, bannedAt=null
+     2. Resets fraudScore record to score=0, triggers=[]
+     3. Clears invalidUploadCounter (consecutiveCount=0, suspendedUntil=null)
+   This prevents the user from being immediately re-banned by the fraud system.
+   ─────────────────────────────────────────────────────────────────────────── */
+async function fullUnban(uid, name) {
+  if (!uid) return;
+  if (!confirm(`Full Unban "${name}"?\n\nThis will:\n• Reactivate the account\n• Reset the fraud score to 0 (prevents immediate re-ban)\n• Clear the AI upload ban counter\n\nAll three ban mechanisms are cleared atomically.`)) return;
+
+  try {
+    const data = await apiFetch('/api/chief/users/' + uid + '/full-unban', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    toast(data.message || `${name} has been fully unbanned`, 'success');
+    loadUsers();   // refresh allUsers → rerenders both table and banned panel
+  } catch (e) {
+    toast('Full unban failed: ' + e.message, 'error');
+  }
+}
+
+/* ── LIFT AI BAN BY UID — used in banned panel (without requiring viewUser) ── */
+async function liftAiBanById(uid, name) {
+  if (!uid) return;
+  if (!confirm(`Lift AI ban for "${name}"?\n\nThis will:\n• Reset the AI prescription upload counter\n• Reactivate account if it was AI-suspended`)) return;
+  try {
+    const data = await apiFetch('/api/chief/users/' + uid + '/lift-ai-ban', {
+      method: 'POST', body: JSON.stringify({}),
+    });
+    toast(data.accountReactivated ? `AI ban lifted & account reactivated for ${name}` : `AI counter reset for ${name}`, 'success');
+    loadUsers();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+
 
 function setRoleFilter(el, role) {
   document.querySelectorAll('[data-role]').forEach(t => t.classList.remove('active'));
