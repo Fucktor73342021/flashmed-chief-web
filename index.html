@@ -873,6 +873,44 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
           </div>
         </div>
 
+        <!-- Pill Reminder -->
+        <div class="fc-card" id="fc-card-pill_reminder">
+          <div class="fc-card-top">
+            <div class="fc-icon" style="background:rgba(234,179,8,.12);color:#CA8A04">⏰</div>
+            <div style="flex:1">
+              <div class="fc-name">Pill Reminder</div>
+              <div class="fc-desc">Medication alarm &amp; daily reminder notifications</div>
+            </div>
+            <label class="tgl" id="tgl-pill_reminder" title="Toggle Pill Reminder">
+              <input type="checkbox" id="fc-pill_reminder" checked onchange="fcToggle('pill_reminder', this.checked)">
+              <span class="tgl-s"></span>
+            </label>
+          </div>
+          <div class="fc-status" id="fc-status-pill_reminder">
+            <span class="pill green" id="fc-pill-pill_reminder">Active</span>
+            <span class="fc-status-text" id="fc-text-pill_reminder">Fully operational</span>
+          </div>
+        </div>
+
+        <!-- Healthcare Products -->
+        <div class="fc-card" id="fc-card-healthcare_products">
+          <div class="fc-card-top">
+            <div class="fc-icon" style="background:rgba(20,184,166,.12);color:#0D9488">🏥</div>
+            <div style="flex:1">
+              <div class="fc-name">Healthcare Products</div>
+              <div class="fc-desc">OTC health &amp; wellness products marketplace</div>
+            </div>
+            <label class="tgl" id="tgl-healthcare_products" title="Toggle Healthcare Products">
+              <input type="checkbox" id="fc-healthcare_products" checked onchange="fcToggle('healthcare_products', this.checked)">
+              <span class="tgl-s"></span>
+            </label>
+          </div>
+          <div class="fc-status" id="fc-status-healthcare_products">
+            <span class="pill green" id="fc-pill-healthcare_products">Active</span>
+            <span class="fc-status-text" id="fc-text-healthcare_products">Fully operational</span>
+          </div>
+        </div>
+
       </div><!-- end fc-cards-grid -->
 
       <!-- Reason field -->
@@ -2318,8 +2356,18 @@ async function loadDocyzBans() {
       </div>`).join('');
 
   } catch (e) {
-    if (subtitleEl) subtitleEl.textContent = 'Error loading — ' + e.message;
-    if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:12px;color:var(--red);font-size:12px">Failed to load: ${e.message}</div>`;
+    const is404 = e.message?.includes('not found') || e.message?.includes('404');
+    const errMsg = is404
+      ? 'Service temporarily unavailable. The backend may be restarting.'
+      : e.message || 'Unknown error';
+    if (subtitleEl) subtitleEl.textContent = 'Error loading Doczy bans';
+    if (listEl) listEl.innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--red);font-size:12px">
+        <div style="font-size:20px;margin-bottom:8px">⚠️</div>
+        <div style="font-weight:700;margin-bottom:4px">Failed to load Doczy AI Bans</div>
+        <div style="color:var(--text3);margin-bottom:12px">${errMsg}</div>
+        <button class="btn-sm" onclick="loadDocyzBans()" style="font-size:11px">🔄 Retry</button>
+      </div>`;
   }
 }
 
@@ -2371,7 +2419,7 @@ function _classifyBan(u) {
   const timedAi = !!(u.aiCounter?.aiBanActive);
   if (!u.isActive && timedAi) return 'ai';
 
-  if (u.isActive === false) {
+  if (!u.isActive) {   // covers false and null (legacy records)
     const r = u.banReason || '';
     if (r.startsWith('AI:')) return 'ai';
     // Fraud ban: stored as JSON array ["multi_account_device","velocity_abuse"]
@@ -2392,8 +2440,8 @@ function _banTypeLabel(type) {
 function renderBannedPanel() {
   // Collect banned users: hard-banned (isActive=false) OR timed AI ban
   const banned = allUsers.filter(u => {
-    if (u.isActive === false) return true;            // hard banned
-    if (u.aiCounter?.aiBanActive) return true;        // timed AI ban
+    if (!u.isActive) return true;                 // hard banned (false or null)
+    if (u.aiCounter?.aiBanActive) return true;    // timed AI ban
     return false;
   });
 
@@ -2436,7 +2484,7 @@ function renderBannedPanel() {
       if (Array.isArray(p)) reasonDisplay = p.join(', ');
     } catch (_) {}
 
-    const hasAiBan = !!(u.isActive === false && (reasonRaw.startsWith('AI:') || u.aiCounter?.aiBanActive)) || !!(u.aiCounter?.aiBanActive);
+    const hasAiBan = !!(!u.isActive && (reasonRaw.startsWith('AI:') || u.aiCounter?.aiBanActive)) || !!(u.aiCounter?.aiBanActive);
 
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,61,87,.1);gap:12px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:10px;min-width:0">
@@ -2544,7 +2592,10 @@ function renderUsersTable() {
   if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">No users found</td></tr>'; return; }
   tbody.innerHTML = rows.map(u => {
     const ai = getAiBanState(u);
-    const statusCell = u.isActive === false
+    // Use falsy check (!u.isActive) so null/undefined/0 also renders as Suspended
+    // (older DB records may have isActive=null instead of isActive=false)
+    const isInactive = !u.isActive; // covers false, null, undefined, 0
+    const statusCell = isInactive
       ? `<span class="pill red">Suspended</span>${ai.hardBan ? ' <span title="AI-suspended" style="font-size:11px">🤖</span>' : ''}`
       : `<span class="pill green">Active</span>${ai.timedBan ? ' <span title="AI upload ban active" style="font-size:11px;color:var(--amber)">🤖</span>' : ''}`;
     const countWarn = ai.count >= 5 && !ai.hasAiBan
@@ -2572,7 +2623,7 @@ function viewUser(uid) {
 
   document.getElementById('user-modal-title').textContent = u.name || 'User';
   document.getElementById('user-modal-uid').textContent = 'UID: ' + uid;
-  document.getElementById('ban-btn').textContent = u.isActive === false ? 'Reactivate User' : 'Suspend User';
+  document.getElementById('ban-btn').textContent = !u.isActive ? 'Reactivate User' : 'Suspend User';
 
   document.getElementById('user-modal-body').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
@@ -2580,7 +2631,7 @@ function viewUser(uid) {
         ['Phone', u.phone || '—'],
         ['Role', u.role || 'customer'],
         ['Email', u.email || '—'],
-        ['Status', u.isActive === false ? '🔴 Suspended' : '🟢 Active'],
+        ['Status', !u.isActive ? '🔴 Suspended' : '🟢 Active'],
         ['AI Uploads', ai.count > 0 ? `${ai.count} invalid${ai.hasAiBan ? ' 🔴' : ai.count >= 5 ? ' ⚠️' : ''}` : 'Clean'],
         ['Joined', fmtDate(u.createdAt)],
         ['On Duty', u.isOnDuty ? 'Yes' : 'No'],
@@ -2643,7 +2694,7 @@ function viewUser(uid) {
 async function banUser() {
   if (!currentUserUid) return;
   const u = allUsers.find(x => x.uid === currentUserUid);
-  const isBanned = u?.isActive === false;
+  const isBanned = !u?.isActive;
   const reason = isBanned ? '' : (prompt('Reason for suspension (optional):') ?? '');
   const btn = document.getElementById('ban-btn');
   btn.disabled = true;
@@ -4194,10 +4245,12 @@ function pcUpdateRelaxationHint() {}
 
 // Map of toggle ID → Firestore flag key
 const FC_MAP = {
-  pharmacy:     'pharmacy_enabled',
-  doctor_booking: 'doctor_booking_enabled',
-  lab_booking:  'lab_booking_enabled',
-  blood_sos:    'blood_sos_enabled',
+  pharmacy:              'pharmacy_enabled',
+  doctor_booking:        'doctor_booking_enabled',
+  lab_booking:           'lab_booking_enabled',
+  blood_sos:             'blood_sos_enabled',
+  pill_reminder:         'pill_reminder_enabled',
+  healthcare_products:   'healthcare_products_enabled',
 };
 // Current state loaded from backend
 let _fcFlags = {};
@@ -4238,10 +4291,12 @@ async function loadFeatureFlags() {
 function fcRender(flags, meta) {
   // Map backend keys to our UI short names
   const uiMap = [
-    { ui: 'pharmacy',      key: 'pharmacy_enabled',       label: 'Healthcare Product' },
-    { ui: 'doctor',        key: 'doctor_booking_enabled',  label: 'Doctor Booking' },
-    { ui: 'lab',           key: 'lab_booking_enabled',     label: 'Lab Booking' },
-    { ui: 'blood',         key: 'blood_sos_enabled',       label: 'Blood SOS' },
+    { ui: 'pharmacy',            key: 'pharmacy_enabled',              label: 'Healthcare Product' },
+    { ui: 'doctor',              key: 'doctor_booking_enabled',         label: 'Doctor Booking' },
+    { ui: 'lab',                 key: 'lab_booking_enabled',            label: 'Lab Booking' },
+    { ui: 'blood',               key: 'blood_sos_enabled',              label: 'Blood SOS' },
+    { ui: 'pill_reminder',       key: 'pill_reminder_enabled',          label: 'Pill Reminder' },
+    { ui: 'healthcare_products', key: 'healthcare_products_enabled',    label: 'Healthcare Products' },
   ];
 
   uiMap.forEach(({ ui, key, label }) => {
@@ -4293,18 +4348,20 @@ function fcEscape(s) {
  * Shows confirm dialog for BLOCKING (not for enabling — low risk).
  */
 async function fcToggle(uiKey, enabled) {
-  // Map UI short key to Firestore flag key
-  const flagKey = uiKey + '_enabled';
+  // Map UI short key → Firestore flag key using FC_MAP (fail-safe: also try direct concat)
+  const flagKey = FC_MAP[uiKey] || (uiKey + '_enabled');
 
   // Blocking requires confirmation — enabling does not (fail-safe direction)
   if (!enabled) {
     const labelMap = {
-      pharmacy_enabled:       'Healthcare Product (Medicine Ordering)',
-      doctor_booking_enabled: 'Doctor Booking',
-      lab_booking_enabled:    'Lab Test Booking',
-      blood_sos_enabled:      'Blood Bank / SOS',
+      pharmacy_enabled:             'Healthcare Product (Medicine Ordering)',
+      doctor_booking_enabled:       'Doctor Booking',
+      lab_booking_enabled:          'Lab Test Booking',
+      blood_sos_enabled:            'Blood Bank / SOS',
+      pill_reminder_enabled:        'Pill Reminder',
+      healthcare_products_enabled:  'Healthcare Products (OTC Marketplace)',
     };
-    const name = labelMap[flagKey] || flagKey;
+    const name = labelMap[flagKey] || flagKey.replace(/_enabled$/, '').replace(/_/g, ' ');
     const reason = document.getElementById('fc-reason')?.value?.trim() || '';
     const confirmMsg =
       '⛔ BLOCK "' + name + '"?\n\n' +
@@ -4314,10 +4371,16 @@ async function fcToggle(uiKey, enabled) {
       'Confirm to proceed. You can re-enable at any time.';
     if (!confirm(confirmMsg)) {
       // Revert toggle visually — user cancelled
-      const chk = document.getElementById('fc-' + uiKey.replace('_booking', '').replace('_sos', ''));
-      // Find the right checkbox
-      const chkMap = { pharmacy: 'fc-pharmacy', doctor_booking: 'fc-doctor', lab_booking: 'fc-lab', blood_sos: 'fc-blood' };
-      const chkEl = document.getElementById(chkMap[uiKey]);
+      // chkMap: maps uiKey → exact checkbox element ID in the DOM
+      const chkMap = {
+        pharmacy:            'fc-pharmacy',
+        doctor_booking:      'fc-doctor',
+        lab_booking:         'fc-lab',
+        blood_sos:           'fc-blood',
+        pill_reminder:       'fc-pill_reminder',
+        healthcare_products: 'fc-healthcare_products',
+      };
+      const chkEl = document.getElementById(chkMap[uiKey] || ('fc-' + uiKey));
       if (chkEl) chkEl.checked = true;
       return;
     }
@@ -4326,7 +4389,7 @@ async function fcToggle(uiKey, enabled) {
   // Accumulate pending change
   _fcPending[flagKey] = enabled;
 
-  // Optimistic UI update immediately
+  // Optimistic UI update immediately
   const merged = { ..._fcFlags, ..._fcPending };
   fcRender(merged, null);
 
@@ -4337,6 +4400,8 @@ async function fcToggle(uiKey, enabled) {
 
 /**
  * fcSavePending() — Flush all pending flag changes to backend.
+ * On success: persists to Firestore via backend, updates local state.
+ * On failure: reverts pending changes to allow retry.
  */
 async function fcSavePending() {
   if (Object.keys(_fcPending).length === 0) return;
@@ -4390,13 +4455,16 @@ async function fcSavePending() {
     if (enabledNames) msg += '  ENABLED: ' + enabledNames;
 
     toast(msg, blockedNames ? 'warn' : 'success');
-    document.getElementById('fc-last-updated').textContent = 'Saved ' + new Date().toLocaleTimeString('en-IN');
+    // Null-safe: a missing element here must NOT throw into catch and
+    // falsely revert a save that already succeeded on the server.
+    const updEl = document.getElementById('fc-last-updated');
+    if (updEl) updEl.textContent = 'Saved ' + new Date().toLocaleTimeString('en-IN');
 
   } catch (e) {
-    // Revert pending changes on failure
+    // Revert pending changes on failure so user can retry
     _fcPending = { ..._fcPending, ...toSave };
     toast('Failed to save feature flags: ' + e.message, 'error');
-    // Revert UI to server-confirmed state
+    // Revert UI to last server-confirmed state
     fcRender(_fcFlags, null);
   }
 }
