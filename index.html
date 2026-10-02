@@ -7,7 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
@@ -1084,9 +1087,12 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
     <div class="content page" id="page-map">
       <div class="section-header">
         <h3>User Registration Map</h3>
-        <span class="count-badge" id="map-count">0 points</span>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="count-badge" id="map-count">0 points</span>
+          <button class="btn-sm" id="map-refresh-btn" onclick="refreshMap()" style="font-size:11px" title="Reload latest map data from server">↻ Refresh</button>
+        </div>
       </div>
-      <p style="color:var(--text2);font-size:13px;margin-bottom:4px">Each dot = one user with saved location. Colour by role.</p>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:4px">Each dot = one patient-app user captured at login (city-level GPS). Clusters auto-group nearby users. Click any cluster or dot to see details.</p>
       <div class="map-legend">
         <div class="map-legend-item"><div class="map-dot" style="background:#7B61FF"></div> Customer</div>
         <div class="map-legend-item"><div class="map-dot" style="background:#00d4ff"></div> Seller</div>
@@ -1094,6 +1100,7 @@ tbody tr:hover td{background:var(--card2);color:var(--text)}
       </div>
       <div id="map"></div>
     </div>
+
 
     <!-- ═══ USERS ═══ -->
     <div class="content page" id="page-users">
@@ -2263,27 +2270,154 @@ function renderPayoutTable(rows) {
 }
 
 /* ══════════════════════════════════════════════
-   MAP
-══════════════════════════════════════════════ */
+   MAP  (Registration Map — patient-app user geo)
+   ══════════════════════════════════════════════
+   Architecture:
+     • Calls GET /api/chief/registration-map for dedicated, paginated data
+       (not bundled with /overview — can be refreshed independently)
+     • Uses Leaflet.markercluster — handles 5 000+ points smoothly
+     • Circle markers color-coded by role
+     • Popups show city/district/state + uid + role
+     • Falls back to legacy overviewData.mapUsers if new endpoint unavailable
+     • refreshMap() clears and reloads all layers (for the Refresh button)
+   ══════════════════════════════════════════════ */
+
+let _mapClusterGroup = null; // holds the current MarkerClusterGroup
+
 async function loadMap() {
-  if (!overviewData) { try { overviewData = await apiFetch('/api/chief/overview'); } catch(e) { toast(e.message,'error'); return; } }
-  const points = overviewData.mapUsers || [];
-  document.getElementById('map-count').textContent = points.length + ' points';
+  /* ── 1. Init Leaflet map (runs once) ── */
   if (!leafletMap) {
     leafletMap = L.map('map').setView([22.5937, 80.9629], 5);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OSM' }).addTo(leafletMap);
-  } else {
-    leafletMap.eachLayer(l => { if (l instanceof L.CircleMarker) leafletMap.removeLayer(l); });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(leafletMap);
   }
+
+  /* ── 2. Remove existing cluster layer ── */
+  if (_mapClusterGroup) {
+    leafletMap.removeLayer(_mapClusterGroup);
+    _mapClusterGroup = null;
+  }
+
+  /* ── 3. Show loading state ── */
+  const countBadge = document.getElementById('map-count');
+  const refreshBtn  = document.getElementById('map-refresh-btn');
+  if (countBadge)  countBadge.textContent  = 'Loading…';
+  if (refreshBtn)  refreshBtn.disabled     = true;
+
+  /* ── 4. Fetch registration map data ── */
+  let points = [];
+  try {
+    const data = await apiFetch('/api/chief/registration-map');
+    points = (data.points || []).filter(p =>
+      Number.isFinite(p.lat) && Number.isFinite(p.lng) &&
+      p.lat >= -90 && p.lat <= 90 && p.lng >= -180 && p.lng <= 180
+    );
+  } catch (e) {
+    /* ── Fallback: if new endpoint unavailable, use legacy overview data ── */
+    console.warn('[Map] /registration-map failed, falling back to overviewData:', e.message);
+    try {
+      if (!overviewData) overviewData = await apiFetch('/api/chief/overview');
+      points = (overviewData.mapUsers || []).map(u => ({
+        uid: u.uid, role: u.role, lat: u.lat, lng: u.lng,
+        city: null, district: null, state: null,
+      })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+    } catch (e2) {
+      toast('Map load failed: ' + e2.message, 'error');
+    }
+  }
+
+  /* ── 5. Build cluster group ── */
   const colorMap = { seller: '#00d4ff', delivery: '#00e676' };
+
+  _mapClusterGroup = L.markerClusterGroup({
+    maxClusterRadius:   60,    // px — tighter clusters for city-level data
+    spiderfyOnMaxZoom:  true,
+    showCoverageOnHover: false,
+    zoomToBoundsOnClick: true,
+    chunkedLoading:     true,  // render in chunks — never freezes browser
+    chunkInterval:      50,    // ms between chunks
+    chunkDelay:         50,
+    iconCreateFunction: (cluster) => {
+      const n = cluster.getChildCount();
+      const size = n < 10 ? 30 : n < 50 ? 36 : n < 200 ? 42 : 50;
+      return L.divIcon({
+        html: `<div style="
+          background:rgba(123,97,255,0.85);
+          border:2.5px solid #fff;
+          border-radius:50%;
+          width:${size}px;height:${size}px;
+          display:flex;align-items:center;justify-content:center;
+          color:#fff;font-size:${n<100?11:10}px;font-weight:700;
+          box-shadow:0 2px 8px rgba(0,0,0,0.35);
+          backdrop-filter:blur(4px);
+        ">${n}</div>`,
+        className: '',
+        iconSize:  L.point(size, size),
+      });
+    },
+  });
+
+  /* ── 6. Add circle markers ── */
   points.forEach(p => {
     const col = colorMap[p.role] || '#7B61FF';
-    L.circleMarker([p.lat, p.lng], { radius: 5, color: col, fillColor: col, fillOpacity: 0.8, weight: 1 })
-      .addTo(leafletMap)
-      .bindPopup(`<b>${p.role}</b><br>${p.uid}`);
+
+    /* Build popup content */
+    const locationLine = [p.city, p.district, p.state]
+      .filter(Boolean).join(', ') || 'Location on map';
+    const dateStr = p.capturedAt
+      ? new Date(p.capturedAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
+      : '—';
+
+    const popupHtml = `
+      <div style="font-family:system-ui,sans-serif;min-width:160px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
+          <b style="font-size:13px;text-transform:capitalize">${p.role}</b>
+        </div>
+        <div style="font-size:12px;color:#555;margin-bottom:2px">📍 ${locationLine}</div>
+        <div style="font-size:11px;color:#888;font-family:monospace">${p.uid}</div>
+        <div style="font-size:10px;color:#aaa;margin-top:3px">Registered: ${dateStr}</div>
+      </div>`;
+
+    const marker = L.circleMarker([p.lat, p.lng], {
+      radius:      6,
+      color:       col,
+      fillColor:   col,
+      fillOpacity: 0.85,
+      weight:      1.5,
+    }).bindPopup(popupHtml, { maxWidth: 240 });
+
+    _mapClusterGroup.addLayer(marker);
   });
-  if (points.length > 1) leafletMap.fitBounds(points.map(p => [p.lat, p.lng]), { padding: [40, 40] });
-  setTimeout(() => leafletMap.invalidateSize(), 200);
+
+  leafletMap.addLayer(_mapClusterGroup);
+
+  /* ── 7. Update count badge ── */
+  if (countBadge) countBadge.textContent = points.length.toLocaleString('en-IN') + ' points';
+  if (refreshBtn)  refreshBtn.disabled  = false;
+
+  /* ── 8. Fit bounds ── */
+  if (points.length > 1) {
+    try {
+      leafletMap.fitBounds(
+        points.map(p => [p.lat, p.lng]),
+        { padding: [40, 40], maxZoom: 10 }
+      );
+    } catch (_) {}
+  } else if (points.length === 1) {
+    leafletMap.setView([points[0].lat, points[0].lng], 10);
+  }
+
+  /* ── 9. Force size recalculation (needed if map container was hidden) ── */
+  setTimeout(() => leafletMap.invalidateSize(), 250);
+}
+
+/* ── Manual refresh — called by the ↻ Refresh button ── */
+async function refreshMap() {
+  await loadMap();
+  toast('Map refreshed', 'success');
 }
 
 /* ══════════════════════════════════════════════
